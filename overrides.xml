@@ -1,0 +1,5 @@
+<overrides xmlns="http://www.ceylon-lang.org/xsd/overrides">
+    <replace groupId="com.google.guava" artifactId="guava" version="18.0">
+        <with groupId="com.google.guava" artifactId="guava" version="19.0" />
+    </replace>
+</overrides>

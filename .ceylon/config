@@ -1,0 +1,14 @@
+
+[compiler]
+source=source
+resource=resource
+
+[defaults]
+autoexportmavendependencies=true
+fullyexportmavendependencies=true
+encoding=UTF-8
+flatclasspath=false
+overrides=overrides.xml
+
+[formattool]
+profile=default
