@@ -1,11 +1,12 @@
-import java.util { TreeMap }
-import ceylon.interop.java { JavaComparator }
-import ceylon.test { ... }
-import ceylon.test.annotation { ... }
-import org.jsimpledb { ... }
-
-JavaComparator<String> stringComparator
-        = JavaComparator<String>((s1, s2) => s1.compare(s2));
+import ceylon.test {
+    ...
+}
+import ceylon.test.annotation {
+    ...
+}
+import org.jsimpledb {
+    ...
+}
 
 void inTransaction(Anything(JTransaction) func) {
     value db = JSimpleDBFactory()
@@ -18,56 +19,6 @@ void inTransaction(Anything(JTransaction) func) {
     } finally {
         tx.rollback();
     }
-}
-
-test
-void searchNoPrefixEntries() {
-    value subject = TreeMap<String, String>(stringComparator);
-    subject.put("b", "b");
-    value actual = prefixSearch("a", subject);
-    assert (actual.empty);
-}
-
-test
-void searchSinglePrefixEntry() {
-    value subject = TreeMap<String, String>(stringComparator);
-    subject.put("a", "a");
-    value actual = prefixSearch("a", subject);
-    assert (actual.size == 1);
-}
-
-
-test
-void searchSinglePrefixEntryWithMiss() {
-    value subject = TreeMap<String, String>(stringComparator);
-    subject.put("a", "a");
-    subject.put("b", "b");
-    value actual = prefixSearch("a", subject);
-    assert (actual.size == 1);
-}
-
-test
-void searchMultiplePrefixEntries() {
-    value subject = TreeMap<String, String>(stringComparator);
-    subject.put("a", "a");
-    subject.put("aa", "aa");
-    subject.put("aaa", "aaa");
-    subject.put("ab", "ab");
-    value actual = prefixSearch("a", subject);
-    assert (actual.size == 4);
-}
-
-test
-void searchMultiplePrefixEntriesWithMisses() {
-    value subject = TreeMap<String, String>(stringComparator);
-    subject.put("a", "a");
-    subject.put("aa", "aa");
-    subject.put("aaa", "aaa");
-    subject.put("ab", "ab");
-    subject.put("b", "b");
-    subject.put("bb", "bb");
-    value actual = prefixSearch("a", subject);
-    assert (actual.size == 4);
 }
 
 test

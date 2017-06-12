@@ -1,60 +1,89 @@
-import java.util { Set, NavigableMap, List, LinkedHashSet }
-import java.util.stream { Collectors { toList } }
+import java.lang {
+    ByteArray
+}
+import java.util {
+    JList = List,
+    NavigableSet
+}
+import java.util.stream {
+    Collectors {
+        toList
+    }
+}
 import org.jsimpledb { ... }
 import org.jsimpledb.annotation { ... }
 import org.jsimpledb.tuple { ... }
-import org.jsimpledb.util { ... }
+import org.jsimpledb.util {
+    NavigableSets { union }
+}
+import ceylon.buffer.charset {
+    utf8
+}
+import ceylon.interop.java {
+    createJavaByteArray,
+    javaClass
+}
 
 jSimpleClass
 shared abstract class AddressBookEntry() satisfies JObject {
+	// Store fields as utf8 arrays to enable prefix queries
     jField__GETTER { indexed = true; }
-    shared formal variable String firstName;
+    shared formal variable ByteArray firstNameField;
     jField__GETTER { indexed = true; }
-    shared formal variable String lastName;
+    shared formal variable ByteArray lastNameField;
     jField__GETTER { indexed = true; }
-    shared formal variable String email;
+    shared formal variable ByteArray emailField;
     jField__GETTER { indexed = true; }
-    shared formal variable String address;
+    shared formal variable ByteArray addressField;
+    
+    shared String firstName => utf8.decode(firstNameField.iterable);
+    assign firstName {
+        firstNameField = createJavaByteArray(utf8.encode(firstName));
+    }
+
+    shared String lastName => utf8.decode(lastNameField.iterable);
+    assign lastName {
+        lastNameField = createJavaByteArray(utf8.encode(lastName));
+    }
+
+    shared String email => utf8.decode(emailField.iterable);
+    assign email {
+        emailField = createJavaByteArray(utf8.encode(email));
+    }
+    
+    shared String address => utf8.decode(addressField.iterable);
+    assign address {
+        addressField = createJavaByteArray(utf8.encode(address));
+    }
+    
+    string => "AddressBookEntry(``firstName``, ``lastName``, ``email``, ``address``)";
 }
 
-Iterable<Result> prefixSearch<Result>(
-    String prefix,
-    NavigableMap<String, Result> subject
-) {
-     object result satisfies Iterable<Result> {
-         class ResultIterator() satisfies Iterator<Result> {
-             variable String? key = subject.floorKey(prefix);
-
-             shared actual Result|Finished next() {
-                 if (exists k = key, k.startsWith(prefix)) {
-                     key = subject.higherKey(k);
-                     return subject.get(k);
-                 } else {
-                     return finished;
-                 }
-             }
-         }
-         iterator() => ResultIterator();
-     }
-     return result;
+shared NavigableSet<T> indexLookup<T>(
+    JTransaction tx,
+    String index,
+    String prefix
+) given T satisfies Object {
+    List<Byte> fromKey = utf8.encode(prefix);
+    // UTF-8 can't contain 0xFF's, so this is safe
+    List<Byte> toKey = fromKey.mapElements((i, b) =>
+                                                i == fromKey.size - 1
+                                                then b + 1.byte
+                                                else b);
+    return union(tx
+        .queryIndex(javaClass<T>(), index, javaClass<ByteArray>())
+        .asMap()
+        .subMap(createJavaByteArray(fromKey), createJavaByteArray(toKey))
+        .values());
 }
+
 
 shared class AddressBook(JTransaction() tx) {
     Integer entriesPerPage = 10;
     shared variable String searchTerm = "";
     shared variable Integer currentPage = 1;
     
-    shared List<AddressBookEntry> entries {
-        void findEntries(Set<AddressBookEntry> entries, String field) {
-            for (vals in prefixSearch(
-                searchTerm,
-                tx().queryIndex(`AddressBookEntry`, field, `String`).asMap())) {
-                for (val in vals) {
-                    entries.add(val);
-                }
-            }
-        }
-        
+    shared JList<AddressBookEntry> entries {
         if (searchTerm == "") {
             return tx()
                     .getAll(`AddressBookEntry`)
@@ -63,11 +92,12 @@ shared class AddressBook(JTransaction() tx) {
                     .limit(entriesPerPage)
                     .collect(toList<AddressBookEntry>());
         } else {
-            value entries = LinkedHashSet<AddressBookEntry>();
-            findEntries(entries, "firstName");
-            findEntries(entries, "lastName");
-            findEntries(entries, "email");
-            findEntries(entries, "address");
+            value entries = union(
+                indexLookup<AddressBookEntry>(tx(), "firstNameField", searchTerm),
+                indexLookup<AddressBookEntry>(tx(), "lastNameField", searchTerm),
+                indexLookup<AddressBookEntry>(tx(), "emailField", searchTerm),
+                indexLookup<AddressBookEntry>(tx(), "addressField", searchTerm)
+            );
             return entries
                     .stream()
                     .skip((currentPage-1) * entriesPerPage)
